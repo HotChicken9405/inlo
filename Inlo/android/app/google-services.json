@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "377469784644",
+    "project_id": "inlo-1264a",
+    "storage_bucket": "inlo-1264a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:377469784644:android:d3db3e5133131bd274e211",
+        "android_client_info": {
+          "package_name": "com.example.inlo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "377469784644-26c6tm6d1cvolm5gjijat07a1m13i337.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.inlo",
+            "certificate_hash": "6c8aa35d03b334545457a507fac596a79e969a1d"
+          }
+        },
+        {
+          "client_id": "377469784644-k1hcdmej7ch695o8n96l7rfqaoij6t54.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9zyte-XSnoV5T5IdTf-YN5ZgmkvG9HEQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "377469784644-k1hcdmej7ch695o8n96l7rfqaoij6t54.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "377469784644-2qk0u05e81gj4r3rsjj2chg9qsahe1pe.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.inlo"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
