@@ -18,7 +18,8 @@ dependencies:
   image_picker: ^1.1.2
   http: ^1.2.2
   table_calendar: ^3.1.2
-  emailjs: ^3.0.1
+  emailjs: ^4.0.0   # change this
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
