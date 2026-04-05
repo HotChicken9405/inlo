@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'signup_screen.dart';
 import 'customer_home_screen.dart';
+import 'host_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,7 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-
     setState(() => _isLoading = true);
 
     try {
@@ -47,21 +47,25 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (role == 'host') {
-        // TODO: Navigate to host dashboard (coming next)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Host dashboard coming soon!')),
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const HostDashboardScreen()),
         );
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const CustomerHomeScreen()),
+          MaterialPageRoute(
+              builder: (_) => const CustomerHomeScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed';
-      if (e.code == 'user-not-found') message = 'No user found with that email';
+      if (e.code == 'user-not-found')
+        message = 'No user found with that email';
       if (e.code == 'wrong-password') message = 'Wrong password';
-      if (e.code == 'invalid-email') message = 'Invalid email address';
+      if (e.code == 'invalid-email')
+        message = 'Invalid email address';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
@@ -75,7 +79,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAccount? googleUser =
+      await GoogleSignIn().signIn();
       if (googleUser == null) {
         setState(() => _isLoading = false);
         return;
@@ -114,13 +119,16 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (role == 'host') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Host dashboard coming soon!')),
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const HostDashboardScreen()),
         );
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const CustomerHomeScreen()),
+          MaterialPageRoute(
+              builder: (_) => const CustomerHomeScreen()),
         );
       }
     } catch (e) {
@@ -176,7 +184,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   hintText: 'user@example.com',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  hintStyle:
+                  TextStyle(color: Colors.grey.shade400),
                   filled: true,
                   fillColor: Colors.grey.shade100,
                   border: OutlineInputBorder(
@@ -202,7 +211,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  hintStyle:
+                  TextStyle(color: Colors.grey.shade400),
                   filled: true,
                   fillColor: Colors.grey.shade100,
                   border: OutlineInputBorder(
@@ -212,11 +222,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 14),
                   suffixIcon: TextButton(
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword),
                     child: Text(
                       _obscurePassword ? 'Show' : 'Hide',
-                      style: TextStyle(color: Colors.blue.shade700),
+                      style:
+                      TextStyle(color: Colors.blue.shade700),
                     ),
                   ),
                 ),
@@ -228,7 +239,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {},
                   child: Text(
                     'Forgot password?',
-                    style: TextStyle(color: Colors.blue.shade700),
+                    style:
+                    TextStyle(color: Colors.blue.shade700),
                   ),
                 ),
               ),
@@ -236,16 +248,18 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                    child: CircularProgressIndicator())
                     : ElevatedButton(
                   onPressed: _signInWithEmail,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black87,
                     foregroundColor: Colors.white,
-                    padding:
-                    const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius:
+                      BorderRadius.circular(10),
                     ),
                   ),
                   child: const Text(
@@ -257,15 +271,21 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  Expanded(
+                      child:
+                      Divider(color: Colors.grey.shade300)),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12),
                     child: Text(
                       'or',
-                      style: TextStyle(color: Colors.grey.shade400),
+                      style: TextStyle(
+                          color: Colors.grey.shade400),
                     ),
                   ),
-                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  Expanded(
+                      child:
+                      Divider(color: Colors.grey.shade300)),
                 ],
               ),
               const SizedBox(height: 20),
@@ -273,10 +293,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: _signInWithGoogle,
-                  icon: const Icon(
-                      Icons.g_mobiledata,
-                      size: 24,
-                      color: Colors.red),
+                  icon: const Icon(Icons.g_mobiledata,
+                      size: 24, color: Colors.red),
                   label: const Text(
                     'Continue with Google',
                     style: TextStyle(
@@ -285,8 +303,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(color: Colors.grey.shade300),
+                    padding:
+                    const EdgeInsets.symmetric(vertical: 14),
+                    side:
+                    BorderSide(color: Colors.grey.shade300),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -300,7 +320,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Text(
                       "Don't have an account? ",
-                      style: TextStyle(color: Colors.grey.shade500),
+                      style:
+                      TextStyle(color: Colors.grey.shade500),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.push(
