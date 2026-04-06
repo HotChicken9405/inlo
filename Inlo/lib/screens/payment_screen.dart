@@ -52,16 +52,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  String _formatCardNumber(String value) {
-    final clean = value.replaceAll(' ', '');
-    final buffer = StringBuffer();
-    for (int i = 0; i < clean.length; i++) {
-      if (i > 0 && i % 4 == 0) buffer.write(' ');
-      buffer.write(clean[i]);
-    }
-    return buffer.toString();
-  }
-
   bool _validateCard() {
     if (_emailController.text.trim().isEmpty) {
       _showSnack('Please enter your email address');
@@ -104,16 +94,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (!_validateCard()) return;
     setState(() => _isLoading = true);
 
-    // Generate 6-digit OTP
-    final otp =
-    (100000 + Random().nextInt(900000)).toString();
+    final otp = (100000 + Random().nextInt(900000)).toString();
 
-    // Send OTP via EmailJS
     try {
       final response = await http.post(
-        Uri.parse(
-            'https://api.emailjs.com/api/v1.0/email/send'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+        headers: {
+          'Content-Type': 'application/json',
+          'origin': 'http://localhost',
+        },
         body: jsonEncode({
           'service_id': 'service_5zr6udv',
           'template_id': 'template_g7wvulb',
@@ -131,6 +120,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
           },
         }),
       );
+
+      print('EmailJS status: ${response.statusCode}');
+      print('EmailJS body: ${response.body}');
 
       if (!mounted) return;
 
@@ -154,10 +146,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         );
       } else {
-        _showSnack('Failed to send OTP. Please try again.');
+        _showSnack('Failed to send OTP: ${response.body}');
       }
     } catch (e) {
-      _showSnack('Error sending OTP: $e');
+      print('HTTP error: $e');
+      _showSnack('Failed to send OTP: $e');
     }
 
     setState(() => _isLoading = false);
@@ -179,12 +172,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back,
+              color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Payment',
             style: TextStyle(
-                color: Colors.black87, fontWeight: FontWeight.bold)),
+                color: Colors.black87,
+                fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -209,17 +204,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Text(
                     widget.propertyData['propertyName'] ?? '',
                     style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     widget.propertyData['city'] ?? '',
                     style: TextStyle(
-                        color: Colors.grey.shade500, fontSize: 13),
+                        color: Colors.grey.shade500,
+                        fontSize: 13),
                   ),
                   const Divider(height: 20),
-                  _summaryRow(
-                      'Room', widget.room['name']),
+                  _summaryRow('Room', widget.room['name']),
                   _summaryRow('Check-in',
                       _formatDate(widget.checkIn)),
                   _summaryRow('Check-out',
@@ -347,7 +343,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
                 child: Stack(
                   children: [
-                    // Circles decoration
                     Positioned(
                       top: -30,
                       right: -30,
@@ -393,8 +388,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                       FontWeight.bold,
                                       fontSize: 16,
                                       letterSpacing: 2)),
-                              if (_detectedCardType ==
-                                  'visa')
+                              if (_detectedCardType == 'visa')
                                 const Text('VISA',
                                     style: TextStyle(
                                         color: Colors.white,
@@ -421,7 +415,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                     child: Container(
                                       width: 28,
                                       height: 28,
-                                      decoration: BoxDecoration(
+                                      decoration:
+                                      BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: Colors.orange
                                             .withOpacity(0.9),
@@ -479,8 +474,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                             : _nameController
                                             .text
                                             .toUpperCase(),
-                                        style:
-                                        const TextStyle(
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 13,
                                           fontWeight:
@@ -509,8 +503,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                             ? 'MM/YY'
                                             : _expiryController
                                             .text,
-                                        style:
-                                        const TextStyle(
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 13,
                                           fontWeight:
@@ -531,7 +524,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Card number
               _cardField(
                 label: 'CARD NUMBER',
                 controller: _cardNumberController,
@@ -587,8 +579,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 hint: 'As shown on card',
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 8),
-              // Accepted cards row
+              const SizedBox(height: 12),
+
+              // Accepted cards
               Row(
                 children: [
                   Text('Accepted: ',
@@ -610,44 +603,47 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             color: Colors.blue,
                             fontStyle: FontStyle.italic)),
                   ),
-                  const SizedBox(width: 6),
-                  Row(children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.red.withOpacity(0.9),
-                        border: Border.all(
-                            color: Colors.grey.shade300),
-                      ),
-                    ),
-                    Transform.translate(
-                      offset: const Offset(-6, 0),
-                      child: Container(
+                  const SizedBox(width: 8),
+                  Row(
+                    children: [
+                      Container(
                         width: 16,
                         height: 16,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color:
-                          Colors.orange.withOpacity(0.9),
+                          color: Colors.red.withOpacity(0.9),
                           border: Border.all(
                               color: Colors.grey.shade300),
                         ),
                       ),
-                    ),
-                    Transform.translate(
-                      offset: const Offset(-10, 0),
-                      child: Text('Mastercard',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade600)),
-                    ),
-                  ]),
+                      Transform.translate(
+                        offset: const Offset(-6, 0),
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color:
+                            Colors.orange.withOpacity(0.9),
+                            border: Border.all(
+                                color: Colors.grey.shade300),
+                          ),
+                        ),
+                      ),
+                      Transform.translate(
+                        offset: const Offset(-10, 0),
+                        child: Text('Mastercard',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ],
 
+            // Cash info
             if (_paymentMethod == 'cash') ...[
               Container(
                 padding: const EdgeInsets.all(16),
@@ -686,7 +682,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   : ElevatedButton(
                 onPressed: _sendOtpAndProceed,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
+                  backgroundColor:
+                  Colors.blue.shade600,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                       vertical: 16),
@@ -708,7 +705,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.lock_outline,
-                      size: 14, color: Colors.grey.shade400),
+                      size: 14,
+                      color: Colors.grey.shade400),
                   const SizedBox(width: 6),
                   Text('Secured by Inlo Pay',
                       style: TextStyle(
@@ -843,7 +841,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 class _CardNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+      TextEditingValue oldValue,
+      TextEditingValue newValue) {
     final text = newValue.text.replaceAll(' ', '');
     final buffer = StringBuffer();
     for (int i = 0; i < text.length; i++) {
@@ -863,7 +862,8 @@ class _CardNumberFormatter extends TextInputFormatter {
 class _ExpiryFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+      TextEditingValue oldValue,
+      TextEditingValue newValue) {
     final text = newValue.text.replaceAll('/', '');
     if (text.length >= 2) {
       final formatted =
