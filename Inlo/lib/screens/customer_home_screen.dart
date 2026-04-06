@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'property_detail_screen.dart';
+import 'customer_profile_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -59,10 +60,19 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                               color: Colors.black87)),
                     ],
                   ),
-                  CircleAvatar(
-                    backgroundColor: Colors.grey.shade100,
-                    child: Icon(Icons.person_outline,
-                        color: Colors.grey.shade600),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const CustomerProfileScreen()),
+                      );
+                    },
+                    child: CircleAvatar(
+                      backgroundColor: Colors.grey.shade100,
+                      child: Icon(Icons.person_outline,
+                          color: Colors.grey.shade600),
+                    ),
                   ),
                 ],
               ),
