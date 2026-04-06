@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'booking_summary_screen.dart';
 
+
 class RoomSelectionScreen extends StatefulWidget {
   final String propertyId;
   final Map<String, dynamic> data;
@@ -61,12 +62,35 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   }
 
   bool _isRoomBooked(Map<String, dynamic> room) {
-    final bookedDates =
-    List<Map<String, dynamic>>.from(room['bookedDates'] ?? []);
-    for (final booking in bookedDates) {
-      final bookedFrom =
-      (booking['from'] as Timestamp).toDate();
-      final bookedTo = (booking['to'] as Timestamp).toDate();
+    final bookedDates = room['bookedDates'];
+    if (bookedDates == null) return false;
+
+    final List<dynamic> bookings = bookedDates as List<dynamic>;
+    if (bookings.isEmpty) return false;
+
+    for (final booking in bookings) {
+      final bookingMap = booking as Map<String, dynamic>;
+      final fromRaw = bookingMap['from'];
+      final toRaw = bookingMap['to'];
+
+      if (fromRaw == null || toRaw == null) continue;
+
+      DateTime bookedFrom;
+      DateTime bookedTo;
+
+      if (fromRaw is Timestamp) {
+        bookedFrom = fromRaw.toDate();
+      } else {
+        continue;
+      }
+
+      if (toRaw is Timestamp) {
+        bookedTo = toRaw.toDate();
+      } else {
+        continue;
+      }
+
+      // Check overlap
       if (_checkIn.isBefore(bookedTo) &&
           _checkOut.isAfter(bookedFrom)) {
         return true;
