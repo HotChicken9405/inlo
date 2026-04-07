@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'login_screen.dart';
+import '../utils/maps_helper.dart';
 
 class HostPropertyRegistrationScreen extends StatefulWidget {
   const HostPropertyRegistrationScreen({super.key});
@@ -55,6 +56,12 @@ class _HostPropertyRegistrationScreenState
   // Seasonal availability
   DateTime _availableFrom = DateTime.now();
   DateTime _availableTo = DateTime.now().add(const Duration(days: 365));
+
+  // Maps
+  final _mapsLinkController = TextEditingController();
+  double? _latitude;
+  double? _longitude;
+  bool _mapsLinkValid = false;
 
   final List<String> _propertyTypes = [
     'House', 'Villa', 'Apartment', 'Cottage',
@@ -161,6 +168,21 @@ class _HostPropertyRegistrationScreenState
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  void _validateMapsLink(String url) {
+    final coords = MapsHelper.extractCoordinates(url);
+    setState(() {
+      if (coords != null) {
+        _latitude = coords['lat'];
+        _longitude = coords['lng'];
+        _mapsLinkValid = true;
+      } else {
+        _latitude = null;
+        _longitude = null;
+        _mapsLinkValid = false;
+      }
+    });
+  }
+
   Future<void> _submitRegistration() async {
     if (!_validateStep2()) return;
     setState(() => _isLoading = true);
@@ -235,6 +257,9 @@ class _HostPropertyRegistrationScreenState
         'availableFrom': Timestamp.fromDate(_availableFrom),
         'availableTo': Timestamp.fromDate(_availableTo),
         'photos': photoUrls,
+        'latitude': _latitude ?? 0.0,
+        'longitude': _longitude ?? 0.0,
+        'mapsLink': _mapsLinkController.text.trim(),
         'createdAt': Timestamp.now(),
         'isActive': true,
       });
@@ -585,6 +610,90 @@ class _HostPropertyRegistrationScreenState
                   borderRadius: BorderRadius.circular(10)),
             ),
           ),
+          const SizedBox(height: 24),
+
+          // ── Google Maps Link ──
+          _buildLabel('GOOGLE MAPS LINK'),
+          const SizedBox(height: 6),
+          Text(
+            'Open Google Maps → search your property → tap Share → Copy link',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _mapsLinkController,
+            onChanged: _validateMapsLink,
+            decoration: InputDecoration(
+              hintText: 'Paste Google Maps link here',
+              hintStyle: TextStyle(color: Colors.grey.shade400),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
+              suffixIcon: _mapsLinkController.text.isNotEmpty
+                  ? Icon(
+                _mapsLinkValid
+                    ? Icons.check_circle
+                    : Icons.error_outline,
+                color: _mapsLinkValid ? Colors.green : Colors.red,
+              )
+                  : null,
+            ),
+          ),
+          if (_mapsLinkValid &&
+              _latitude != null &&
+              _longitude != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on,
+                      color: Colors.green.shade600, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Location found: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
+                    style: TextStyle(
+                        color: Colors.green.shade700, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (_mapsLinkController.text.isNotEmpty &&
+              !_mapsLinkValid) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline,
+                      color: Colors.red.shade600, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Could not extract location. Try copying the link again from Google Maps.',
+                      style: TextStyle(
+                          color: Colors.red.shade700, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
 
           // ── Seasonal availability ──
