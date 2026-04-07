@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import '../utils/maps_helper.dart';
 import 'login_screen.dart';
 
 class HostProfileScreen extends StatefulWidget {
@@ -33,6 +34,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
   final _cityController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
+  final _mapsLinkController = TextEditingController();
   String _propertyId = '';
   bool _wifiAvailable = false;
   bool _parkingAvailable = false;
@@ -64,8 +66,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
         .get();
 
     if (propSnap.docs.isNotEmpty) {
-      final propData =
-      propSnap.docs.first.data();
+      final propData = propSnap.docs.first.data();
       _propertyId = propSnap.docs.first.id;
       _propertyNameController.text =
           propData['propertyName'] ?? '';
@@ -75,6 +76,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
           propData['description'] ?? '';
       _priceController.text =
           propData['pricePerNight']?.toString() ?? '';
+      _mapsLinkController.text = propData['mapsLink'] ?? '';
       final amenities = Map<String, dynamic>.from(
           propData['amenities'] ?? {});
       _wifiAvailable = amenities['wifi'] ?? false;
@@ -155,6 +157,13 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
             'pool': _poolAvailable,
             'ac': _acAvailable,
           },
+          'mapsLink': _mapsLinkController.text.trim(),
+          'latitude': MapsHelper.extractCoordinates(
+              _mapsLinkController.text.trim())?['lat'] ??
+              0.0,
+          'longitude': MapsHelper.extractCoordinates(
+              _mapsLinkController.text.trim())?['lng'] ??
+              0.0,
         });
       }
 
@@ -349,7 +358,8 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                       BorderRadius.circular(10),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding: const EdgeInsets.all(14),
+                    contentPadding:
+                    const EdgeInsets.all(14),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -361,6 +371,14 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                   enabled: _isEditing,
                   keyboardType: TextInputType.number,
                 ),
+                const SizedBox(height: 14),
+                _buildLabel('GOOGLE MAPS LINK'),
+                const SizedBox(height: 8),
+                _buildField(
+                  controller: _mapsLinkController,
+                  hint: 'Paste Google Maps link',
+                  enabled: _isEditing,
+                ),
                 const SizedBox(height: 16),
 
                 // Amenities toggles
@@ -370,32 +388,28 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                     'Animals / Pets allowed',
                     Icons.pets,
                     _animalsAllowed,
-                        (v) => setState(
-                            () => _animalsAllowed = v)),
+                        (v) => setState(() => _animalsAllowed = v)),
                 _buildSwitchTile(
                     'Wi-Fi available',
                     Icons.wifi,
                     _wifiAvailable,
-                        (v) => setState(
-                            () => _wifiAvailable = v)),
+                        (v) => setState(() => _wifiAvailable = v)),
                 _buildSwitchTile(
                     'Parking available',
                     Icons.local_parking,
                     _parkingAvailable,
-                        (v) => setState(
-                            () => _parkingAvailable = v)),
+                        (v) =>
+                        setState(() => _parkingAvailable = v)),
                 _buildSwitchTile(
                     'Swimming pool',
                     Icons.pool,
                     _poolAvailable,
-                        (v) =>
-                        setState(() => _poolAvailable = v)),
+                        (v) => setState(() => _poolAvailable = v)),
                 _buildSwitchTile(
                     'Air conditioning',
                     Icons.ac_unit,
                     _acAvailable,
-                        (v) =>
-                        setState(() => _acAvailable = v)),
+                        (v) => setState(() => _acAvailable = v)),
                 const SizedBox(height: 8),
               ],
 
@@ -421,8 +435,8 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                               12)),
                     ),
                     child: const Text('Save changes',
-                        style: TextStyle(
-                            fontSize: 16)),
+                        style:
+                        TextStyle(fontSize: 16)),
                   ),
                 ),
               ],
@@ -520,8 +534,8 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                       _sectionTitle('Booking History'),
                       const SizedBox(height: 14),
                       ...docs.map((doc) {
-                        final data = doc.data()
-                        as Map<String, dynamic>;
+                        final data =
+                        doc.data() as Map<String, dynamic>;
                         return Container(
                           margin: const EdgeInsets.only(
                               bottom: 12),
@@ -547,8 +561,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                                     .spaceBetween,
                                 children: [
                                   Text(
-                                      data['bookingId'] ??
-                                          '',
+                                      data['bookingId'] ?? '',
                                       style: TextStyle(
                                           color: Colors
                                               .grey.shade400,

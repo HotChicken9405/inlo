@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'booking_confirmed_screen.dart';
@@ -57,6 +59,45 @@ class _OtpVerificationScreenState
       _focusNodes[index - 1].requestFocus();
     }
     setState(() => _hasError = false);
+  }
+
+  Future<void> _notifyHost(String bookingId) async {
+    try {
+      // Get host email
+      final hostDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.propertyData['hostId'])
+          .get();
+      final hostEmail = hostDoc.data()?['email'] ?? '';
+      final hostName = hostDoc.data()?['name'] ?? 'Host';
+
+      if (hostEmail.isEmpty) return;
+
+      await http.post(
+        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+        headers: {
+          'Content-Type': 'application/json',
+          'origin': 'http://localhost',
+        },
+        body: jsonEncode({
+          'service_id': 'service_5zr6udv',
+          'template_id': 'template_g7wvulb',
+          'user_id': 'rfgvvlUuiI-wgNGr6',
+          'template_params': {
+            'to_email': hostEmail,
+            'to_name': hostName,
+            'otp_code': 'NEW BOOKING',
+            'property_name':
+            widget.propertyData['propertyName'] ?? '',
+            'total_amount':
+            'Booking ID: $bookingId\nRoom: ${widget.room['name']}\nCheck-in: ${widget.checkIn.day}/${widget.checkIn.month}/${widget.checkIn.year}\nCheck-out: ${widget.checkOut.day}/${widget.checkOut.month}/${widget.checkOut.year}\nGuests: ${widget.guests}\nTotal: LKR ${widget.totalAmount.toStringAsFixed(0)}',
+          },
+        }),
+      );
+    } catch (e) {
+      // Silently fail — don't block booking if email fails
+      print('Host notification failed: $e');
+    }
   }
 
   Future<void> _verifyOtp() async {
@@ -127,14 +168,16 @@ class _OtpVerificationScreenState
 
       await propertyRef.update({'roomTypes': roomTypes});
 
+      // Send email to host
+      await _notifyHost(bookingId);
+
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (_) => BookingConfirmedScreen(
             bookingId: bookingId,
-            propertyName:
-            widget.propertyData['propertyName'],
+            propertyName: widget.propertyData['propertyName'],
             roomName: widget.room['name'],
             checkIn: widget.checkIn,
             checkOut: widget.checkOut,
@@ -162,8 +205,7 @@ class _OtpVerificationScreenState
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back,
-              color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -197,8 +239,7 @@ class _OtpVerificationScreenState
                     fontSize: 14,
                     height: 1.5),
                 children: [
-                  const TextSpan(
-                      text: 'We sent a 6-digit OTP to\n'),
+                  const TextSpan(text: 'We sent a 6-digit OTP to\n'),
                   TextSpan(
                     text: widget.email,
                     style: TextStyle(
@@ -212,8 +253,7 @@ class _OtpVerificationScreenState
 
             // OTP boxes
             Row(
-              mainAxisAlignment:
-              MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(6, (index) {
                 return SizedBox(
                   width: 48,
@@ -225,17 +265,14 @@ class _OtpVerificationScreenState
                     keyboardType: TextInputType.number,
                     maxLength: 1,
                     inputFormatters: [
-                      FilteringTextInputFormatter
-                          .digitsOnly
+                      FilteringTextInputFormatter.digitsOnly
                     ],
-                    onChanged: (v) =>
-                        _onOtpChanged(index, v),
+                    onChanged: (v) => _onOtpChanged(index, v),
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: _hasError
-                          ? Colors.red
-                          : Colors.black87,
+                      color:
+                      _hasError ? Colors.red : Colors.black87,
                     ),
                     decoration: InputDecoration(
                       counterText: '',
@@ -244,8 +281,7 @@ class _OtpVerificationScreenState
                           ? Colors.red.shade50
                           : Colors.grey.shade100,
                       border: OutlineInputBorder(
-                        borderRadius:
-                        BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: _hasError
                               ? Colors.red
@@ -254,8 +290,7 @@ class _OtpVerificationScreenState
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius:
-                        BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: _hasError
                               ? Colors.red.shade300
@@ -264,8 +299,7 @@ class _OtpVerificationScreenState
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius:
-                        BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: _hasError
                               ? Colors.red
@@ -288,8 +322,7 @@ class _OtpVerificationScreenState
                   const SizedBox(width: 6),
                   Text('Incorrect OTP. Please try again.',
                       style: TextStyle(
-                          color: Colors.red.shade400,
-                          fontSize: 13)),
+                          color: Colors.red.shade400, fontSize: 13)),
                 ],
               ),
             ],
@@ -299,19 +332,16 @@ class _OtpVerificationScreenState
             SizedBox(
               width: double.infinity,
               child: _isLoading
-                  ? const Center(
-                  child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                 onPressed: _verifyOtp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                  Colors.blue.shade600,
+                  backgroundColor: Colors.blue.shade600,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 16),
+                  padding:
+                  const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Verify & Confirm',
                     style: TextStyle(fontSize: 16)),
@@ -324,8 +354,7 @@ class _OtpVerificationScreenState
                 child: Text(
                   'Change email or payment method',
                   style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 13),
+                      color: Colors.grey.shade500, fontSize: 13),
                 ),
               ),
             ),

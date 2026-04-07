@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'room_selection_screen.dart';
+import '../utils/maps_helper.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final String propertyId;
@@ -12,12 +15,170 @@ class PropertyDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<PropertyDetailScreen> createState() => _PropertyDetailScreenState();
+  State<PropertyDetailScreen> createState() =>
+      _PropertyDetailScreenState();
 }
 
-class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
+class _PropertyDetailScreenState
+    extends State<PropertyDetailScreen> {
   int _currentPhoto = 0;
   bool _isSaved = false;
+  WebViewController? _mapController;
+
+  @override
+  void initState() {
+    super.initState();
+    _initMapController();
+  }
+
+  void _initMapController() {
+    final embedUrl = widget.data['mapEmbedUrl'] as String?;
+    final lat = (widget.data['latitude'] as num?)?.toDouble();
+    final lng = (widget.data['longitude'] as num?)?.toDouble();
+
+    String? iframeSrc;
+
+    if (embedUrl != null && embedUrl.isNotEmpty) {
+      // Use the stored embed URL directly
+      iframeSrc = embedUrl;
+    } else if (lat != null && lng != null && !(lat == 0.0 && lng == 0.0)) {
+      // Fallback: build a basic embed from coordinates
+      iframeSrc =
+      'https://maps.google.com/maps?q=$lat,$lng&output=embed';
+    }
+
+    if (iframeSrc == null) return;
+
+    final html = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    iframe { width: 100%; height: 100%; border: none; display: block; }
+  </style>
+</head>
+<body>
+  <iframe
+    src="$iframeSrc"
+    allowfullscreen=""
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade">
+  </iframe>
+</body>
+</html>
+''';
+
+    _mapController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..loadHtmlString(html);
+  }
+
+  Widget _buildMapView() {
+    final hasEmbed = (widget.data['mapEmbedUrl'] as String?)?.isNotEmpty == true;
+    final lat = (widget.data['latitude'] as num?)?.toDouble();
+    final lng = (widget.data['longitude'] as num?)?.toDouble();
+    final hasCoords =
+        lat != null && lng != null && !(lat == 0.0 && lng == 0.0);
+
+    if (_mapController == null && !hasEmbed && !hasCoords) {
+      return Container(
+        height: 220,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            'No location available',
+            style: TextStyle(color: Colors.grey.shade400),
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 220,
+        child: Stack(
+          children: [
+            if (_mapController != null)
+              WebViewWidget(controller: _mapController!)
+            else
+              Container(color: Colors.grey.shade100),
+
+            // "Open in Maps" overlay button (bottom-right)
+            if (hasCoords || hasEmbed)
+              Positioned(
+                bottom: 10,
+                right: 10,
+                child: GestureDetector(
+                  onTap: () async {
+                    final url = hasCoords
+                        ? MapsHelper.buildPinUrl(
+                      lat!,
+                      lng!,
+                      widget.data['propertyName'] ?? 'Property',
+                    )
+                        : _extractMapsLink(
+                        widget.data['mapEmbedUrl'] ?? '');
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 8,
+                        )
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.open_in_new,
+                            size: 14, color: Colors.blue.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Open Maps',
+                          style: TextStyle(
+                            color: Colors.blue.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Converts an embed src URL back into a shareable Google Maps link
+  String _extractMapsLink(String embedSrc) {
+    // Try to pull out a place_id or query from the embed URL
+    final pbMatch = RegExp(r'q=([^&]+)').firstMatch(embedSrc);
+    if (pbMatch != null) {
+      return 'https://www.google.com/maps/search/?api=1&query=${pbMatch.group(1)}';
+    }
+    return 'https://maps.google.com';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +224,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 ),
                 actions: [
                   GestureDetector(
-                    onTap: () => setState(() => _isSaved = !_isSaved),
+                    onTap: () =>
+                        setState(() => _isSaved = !_isSaved),
                     child: Container(
                       margin: const EdgeInsets.all(8),
                       padding: const EdgeInsets.symmetric(
@@ -98,8 +260,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     itemBuilder: (_, i) => Image.network(
                       photos[i],
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey.shade200),
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: Colors.grey.shade200),
                     ),
                   )
                       : Container(color: Colors.grey.shade200),
@@ -125,12 +287,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                 color: _currentPhoto == i
                                     ? Colors.blue.shade600
                                     : Colors.grey.shade300,
-                                borderRadius: BorderRadius.circular(3),
+                                borderRadius:
+                                BorderRadius.circular(3),
                               ),
                             ),
                           ),
                         ),
-                      if (photos.length > 1) const SizedBox(height: 16),
+                      if (photos.length > 1)
+                        const SizedBox(height: 16),
 
                       Text(
                         widget.data['propertyName'] ?? '',
@@ -143,7 +307,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       Text(
                         '${widget.data['address']}, ${widget.data['city']}',
                         style: TextStyle(
-                            color: Colors.grey.shade500, fontSize: 13),
+                            color: Colors.grey.shade500,
+                            fontSize: 13),
                       ),
                       const SizedBox(height: 16),
 
@@ -154,8 +319,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           runSpacing: 8,
                           children: amenityChips
                               .map((a) => Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                            padding:
+                            const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.grey.shade100,
                               borderRadius:
@@ -212,25 +379,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Location placeholder
+                      // Location
                       const Text('Location',
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.black87)),
                       const SizedBox(height: 10),
-                      Container(
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text('Map view',
-                              style: TextStyle(
-                                  color: Colors.grey.shade400)),
-                        ),
-                      ),
+                      _buildMapView(),
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -245,7 +401,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              padding:
+              const EdgeInsets.fromLTRB(20, 12, 20, 24),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
@@ -270,7 +427,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue.shade600,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding:
+                  const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),

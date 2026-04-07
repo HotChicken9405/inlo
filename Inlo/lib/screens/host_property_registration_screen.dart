@@ -57,7 +57,7 @@ class _HostPropertyRegistrationScreenState
   DateTime _availableFrom = DateTime.now();
   DateTime _availableTo = DateTime.now().add(const Duration(days: 365));
 
-  // Maps
+  // Maps — now stores both the embed URL and optionally extracted coords
   final _mapsLinkController = TextEditingController();
   double? _latitude;
   double? _longitude;
@@ -168,8 +168,26 @@ class _HostPropertyRegistrationScreenState
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  void _validateMapsLink(String url) {
-    final coords = MapsHelper.extractCoordinates(url);
+  /// Validates pasted text — accepts either:
+  ///   (a) a Google Maps embed src URL  (maps/embed?pb=...)
+  ///   (b) a regular Google Maps share link  (maps?q=... / @lat,lng)
+  void _validateMapsInput(String value) {
+    final trimmed = value.trim();
+
+    // ── Case A: It's already an embed URL ──
+    if (trimmed.contains('maps/embed') || trimmed.contains('maps.google.com/maps?')) {
+      setState(() {
+        _mapsLinkValid = true;
+        // Try to pull lat/lng from the embed pb string as a bonus
+        final coords = MapsHelper.extractCoordinates(trimmed);
+        _latitude = coords?['lat'];
+        _longitude = coords?['lng'];
+      });
+      return;
+    }
+
+    // ── Case B: It's a share link — extract coords ──
+    final coords = MapsHelper.extractCoordinates(trimmed);
     setState(() {
       if (coords != null) {
         _latitude = coords['lat'];
@@ -178,7 +196,7 @@ class _HostPropertyRegistrationScreenState
       } else {
         _latitude = null;
         _longitude = null;
-        _mapsLinkValid = false;
+        _mapsLinkValid = trimmed.isEmpty ? false : false;
       }
     });
   }
@@ -235,6 +253,19 @@ class _HostPropertyRegistrationScreenState
         'createdAt': Timestamp.now(),
       });
 
+      // Determine the embed URL to save.
+      // If host pasted a full embed src, use it directly.
+      // If they pasted a share link, build a basic embed URL from coords.
+      final pastedValue = _mapsLinkController.text.trim();
+      String mapEmbedUrl = '';
+      if (pastedValue.contains('maps/embed') ||
+          pastedValue.contains('maps.google.com/maps?')) {
+        mapEmbedUrl = pastedValue;
+      } else if (_latitude != null && _longitude != null) {
+        mapEmbedUrl =
+        'https://maps.google.com/maps?q=${_latitude},${_longitude}&output=embed';
+      }
+
       // Save property to Firestore
       await FirebaseFirestore.instance.collection('properties').add({
         'hostId': uid,
@@ -259,7 +290,8 @@ class _HostPropertyRegistrationScreenState
         'photos': photoUrls,
         'latitude': _latitude ?? 0.0,
         'longitude': _longitude ?? 0.0,
-        'mapsLink': _mapsLinkController.text.trim(),
+        'mapsLink': pastedValue,
+        'mapEmbedUrl': mapEmbedUrl,   // ← used by the WebView in property detail
         'createdAt': Timestamp.now(),
         'isActive': true,
       });
@@ -340,8 +372,7 @@ class _HostPropertyRegistrationScreenState
                   color: Colors.black87)),
           const SizedBox(height: 4),
           Text('Step 1 of 2 — Personal information',
-              style:
-              TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
           const SizedBox(height: 28),
           _buildLabel('FULL NAME'),
           const SizedBox(height: 8),
@@ -396,8 +427,7 @@ class _HostPropertyRegistrationScreenState
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
-              child:
-              const Text('Continue', style: TextStyle(fontSize: 16)),
+              child: const Text('Continue', style: TextStyle(fontSize: 16)),
             ),
           ),
         ],
@@ -419,8 +449,7 @@ class _HostPropertyRegistrationScreenState
                   color: Colors.black87)),
           const SizedBox(height: 4),
           Text('Step 2 of 2 — Property information',
-              style:
-              TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
           const SizedBox(height: 28),
 
           _buildLabel('PROPERTY NAME'),
@@ -612,41 +641,84 @@ class _HostPropertyRegistrationScreenState
           ),
           const SizedBox(height: 24),
 
-          // ── Google Maps Link ──
-          _buildLabel('GOOGLE MAPS LINK'),
+          // ── Google Maps location ──
+          _buildLabel('GOOGLE MAPS LOCATION'),
           const SizedBox(height: 6),
-          Text(
-            'Open Google Maps → search your property → tap Share → Copy link',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+
+          // Instruction card
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.blue.shade100),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 6),
+                    Text('How to get the embed URL',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: Colors.blue.shade800)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '1. Open Google Maps and find your property\n'
+                      '2. Tap Share  →  Embed a map\n'
+                      '3. Copy only the URL inside  src="..."\n'
+                      '    (starts with https://www.google.com/maps/embed?pb=...)\n\n'
+                      'Example:\nhttps://www.google.com/maps/embed?pb=!1m18...',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade700,
+                      height: 1.6),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 10),
+
           TextField(
             controller: _mapsLinkController,
-            onChanged: _validateMapsLink,
+            onChanged: _validateMapsInput,
+            maxLines: 3,
             decoration: InputDecoration(
-              hintText: 'Paste Google Maps link here',
-              hintStyle: TextStyle(color: Colors.grey.shade400),
+              hintText:
+              'https://www.google.com/maps/embed?pb=...',
+              hintStyle: TextStyle(
+                  color: Colors.grey.shade400, fontSize: 13),
               filled: true,
               fillColor: Colors.grey.shade100,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.all(14),
               suffixIcon: _mapsLinkController.text.isNotEmpty
-                  ? Icon(
-                _mapsLinkValid
-                    ? Icons.check_circle
-                    : Icons.error_outline,
-                color: _mapsLinkValid ? Colors.green : Colors.red,
+                  ? Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Icon(
+                  _mapsLinkValid
+                      ? Icons.check_circle
+                      : Icons.error_outline,
+                  color: _mapsLinkValid
+                      ? Colors.green
+                      : Colors.red,
+                ),
               )
                   : null,
             ),
           ),
-          if (_mapsLinkValid &&
-              _latitude != null &&
-              _longitude != null) ...[
+
+          // Feedback banners
+          if (_mapsLinkValid) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(12),
@@ -657,13 +729,18 @@ class _HostPropertyRegistrationScreenState
               ),
               child: Row(
                 children: [
-                  Icon(Icons.location_on,
+                  Icon(Icons.check_circle_outline,
                       color: Colors.green.shade600, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Location found: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
-                    style: TextStyle(
-                        color: Colors.green.shade700, fontSize: 13),
+                  Expanded(
+                    child: Text(
+                      _latitude != null && _longitude != null
+                          ? 'Location set: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
+                          : 'Embed URL accepted — map will show the full place card',
+                      style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontSize: 13),
+                    ),
                   ),
                 ],
               ),
@@ -685,7 +762,7 @@ class _HostPropertyRegistrationScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Could not extract location. Try copying the link again from Google Maps.',
+                      'Not recognised. Paste the src="..." URL from the Google Maps embed code.',
                       style: TextStyle(
                           color: Colors.red.shade700, fontSize: 13),
                     ),
@@ -1053,7 +1130,7 @@ class _RoomTypeFormState extends State<_RoomTypeForm> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('PRICE/NIGHT (\$)',
+                      const Text('PRICE/NIGHT (LKR)',
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
