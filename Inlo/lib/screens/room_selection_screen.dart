@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'booking_summary_screen.dart';
 
-
 class RoomSelectionScreen extends StatefulWidget {
   final String propertyId;
   final Map<String, dynamic> data;
@@ -42,8 +41,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content:
-                  Text('Check-out must be after check-in')),
+                  content: Text('Check-out must be after check-in')),
             );
           }
         }
@@ -61,42 +59,33 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     return '${d.day} ${months[d.month - 1]} ${d.year}';
   }
 
-  bool _isRoomBooked(Map<String, dynamic> room) {
+  /// Counts how many bookings for this room type overlap the selected dates.
+  int _overlappingBookings(Map<String, dynamic> room) {
     final bookedDates = room['bookedDates'];
-    if (bookedDates == null) return false;
+    if (bookedDates == null) return 0;
 
-    final List<dynamic> bookings = bookedDates as List<dynamic>;
-    if (bookings.isEmpty) return false;
-
-    for (final booking in bookings) {
-      final bookingMap = booking as Map<String, dynamic>;
-      final fromRaw = bookingMap['from'];
-      final toRaw = bookingMap['to'];
-
-      if (fromRaw == null || toRaw == null) continue;
-
-      DateTime bookedFrom;
-      DateTime bookedTo;
-
-      if (fromRaw is Timestamp) {
-        bookedFrom = fromRaw.toDate();
-      } else {
-        continue;
-      }
-
-      if (toRaw is Timestamp) {
-        bookedTo = toRaw.toDate();
-      } else {
-        continue;
-      }
-
-      // Check overlap
-      if (_checkIn.isBefore(bookedTo) &&
-          _checkOut.isAfter(bookedFrom)) {
-        return true;
+    int count = 0;
+    for (final booking in bookedDates as List<dynamic>) {
+      final bm = booking as Map<String, dynamic>;
+      final fr = bm['from'];
+      final tr = bm['to'];
+      if (fr is Timestamp && tr is Timestamp) {
+        final bookedFrom = fr.toDate();
+        final bookedTo = tr.toDate();
+        // Standard overlap: selected range overlaps booked range
+        if (_checkIn.isBefore(bookedTo) && _checkOut.isAfter(bookedFrom)) {
+          count++;
+        }
       }
     }
-    return false;
+    return count;
+  }
+
+  /// A room type is fully booked only when ALL physical rooms are taken.
+  /// e.g. if count=3 and 2 bookings overlap → still 1 room free → NOT sold out.
+  bool _isFullySoldOut(Map<String, dynamic> room) {
+    final int totalRooms = (room['count'] as num?)?.toInt() ?? 1;
+    return _overlappingBookings(room) >= totalRooms;
   }
 
   @override
@@ -150,12 +139,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: Colors.grey.shade200),
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
                           child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('CHECK-IN',
                                   style: TextStyle(
@@ -173,8 +160,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                       ),
                     ),
                     Padding(
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Icon(Icons.arrow_forward,
                           color: Colors.grey.shade400, size: 16),
                     ),
@@ -186,12 +172,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: Colors.grey.shade200),
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
                           child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('CHECK-OUT',
                                   style: TextStyle(
@@ -216,22 +200,19 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                   children: [
                     const Text('Guests',
                         style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14)),
+                            fontWeight: FontWeight.w500, fontSize: 14)),
                     Row(
                       children: [
                         IconButton(
                           onPressed: () {
-                            if (_guests > 1)
-                              setState(() => _guests--);
+                            if (_guests > 1) setState(() => _guests--);
                           },
                           icon: const Icon(Icons.remove_circle_outline),
                           color: Colors.blue.shade600,
                         ),
                         Text('$_guests',
                             style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
+                                fontSize: 16, fontWeight: FontWeight.w600)),
                         IconButton(
                           onPressed: () => setState(() => _guests++),
                           icon: const Icon(Icons.add_circle_outline),
@@ -250,9 +231,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '${roomTypes.length} room type${roomTypes.length != 1 ? 's' : ''} available for $_nights night${_nights != 1 ? 's' : ''}',
-                style: TextStyle(
-                    color: Colors.grey.shade500, fontSize: 13),
+                '${roomTypes.length} room type${roomTypes.length != 1 ? 's' : ''} · $_nights night${_nights != 1 ? 's' : ''}',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
               ),
             ),
           ),
@@ -263,18 +243,19 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
             child: roomTypes.isEmpty
                 ? Center(
               child: Text('No room types added by host yet',
-                  style:
-                  TextStyle(color: Colors.grey.shade400)),
+                  style: TextStyle(color: Colors.grey.shade400)),
             )
                 : ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: roomTypes.length,
               itemBuilder: (context, index) {
                 final room = roomTypes[index];
-                final isBooked = _isRoomBooked(room);
-                final price =
-                (room['price'] as num).toDouble();
+                final int totalRooms =
+                    (room['count'] as num?)?.toInt() ?? 1;
+                final int booked = _overlappingBookings(room);
+                final int available = totalRooms - booked;
+                final bool soldOut = available <= 0;
+                final price = (room['price'] as num).toDouble();
                 final total = price * _nights;
 
                 return Container(
@@ -283,46 +264,38 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: Colors.grey.shade200),
+                    border: Border.all(color: Colors.grey.shade200),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                        Colors.black.withOpacity(0.04),
+                        color: Colors.black.withOpacity(0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(room['name'],
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15)),
                           Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
                                 'LKR ${price.toStringAsFixed(0)}',
                                 style: TextStyle(
-                                    color:
-                                    Colors.blue.shade600,
-                                    fontWeight:
-                                    FontWeight.bold,
+                                    color: Colors.blue.shade600,
+                                    fontWeight: FontWeight.bold,
                                     fontSize: 15),
                               ),
                               Text('/night',
                                   style: TextStyle(
-                                      color: Colors
-                                          .grey.shade400,
+                                      color: Colors.grey.shade400,
                                       fontSize: 11)),
                             ],
                           ),
@@ -333,43 +306,35 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         children: [
                           _chip(room['bedType'] ?? ''),
                           const SizedBox(width: 8),
-                          _chip(
-                              'Max ${room['maxGuests']}'),
+                          _chip('Max ${room['maxGuests']}'),
                         ],
                       ),
                       const SizedBox(height: 10),
                       Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                padding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: isBooked
+                                  color: soldOut
                                       ? Colors.red.shade50
                                       : Colors.green.shade50,
-                                  borderRadius:
-                                  BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  isBooked
+                                  soldOut
                                       ? 'Sold out'
-                                      : 'Available',
+                                      : '$available of $totalRooms available',
                                   style: TextStyle(
-                                    color: isBooked
+                                    color: soldOut
                                         ? Colors.red.shade600
-                                        : Colors.green
-                                        .shade600,
+                                        : Colors.green.shade600,
                                     fontSize: 12,
-                                    fontWeight:
-                                    FontWeight.w600,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -377,45 +342,36 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                               Text(
                                 'Total: LKR ${total.toStringAsFixed(0)}',
                                 style: TextStyle(
-                                    color:
-                                    Colors.grey.shade600,
+                                    color: Colors.grey.shade600,
                                     fontSize: 13),
                               ),
                             ],
                           ),
-                          if (!isBooked)
+                          if (!soldOut)
                             ElevatedButton(
                               onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) =>
-                                        BookingSummaryScreen(
-                                          propertyId:
-                                          widget.propertyId,
-                                          propertyData:
-                                          widget.data,
-                                          room: room,
-                                          checkIn: _checkIn,
-                                          checkOut: _checkOut,
-                                          guests: _guests,
-                                          nights: _nights,
-                                        ),
+                                    builder: (_) => BookingSummaryScreen(
+                                      propertyId: widget.propertyId,
+                                      propertyData: widget.data,
+                                      room: room,
+                                      checkIn: _checkIn,
+                                      checkOut: _checkOut,
+                                      guests: _guests,
+                                      nights: _nights,
+                                    ),
                                   ),
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                Colors.black87,
+                                backgroundColor: Colors.black87,
                                 foregroundColor: Colors.white,
-                                padding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 10),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(
-                                        8)),
+                                    borderRadius: BorderRadius.circular(8)),
                               ),
                               child: const Text('Book now'),
                             ),
@@ -434,14 +390,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
   Widget _chip(String label) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(label,
-          style: const TextStyle(fontSize: 12)),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }
