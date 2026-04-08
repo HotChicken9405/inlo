@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// --- COLORS ACCESSIBLE TO ALL CLASSES IN THIS FILE ---
+const Color _bgColor      = Color(0xFFF8FAFC);
+const Color _accentIndigo = Color(0xFF6366F1);
+const Color _textMain     = Color(0xFF1E293B);
+const Color _textMuted    = Color(0xFF64748B);
+
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
 
@@ -13,109 +19,99 @@ class _UsersScreenState extends State<UsersScreen> {
   String _search = '';
 
   String _fmt(DateTime d) {
-    const m = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
+    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${d.day} ${m[d.month - 1]} ${d.year}';
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
+    return Container(
+      color: _bgColor,
+      padding: const EdgeInsets.all(40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Users',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold)),
+          const Text('User Management',
+              style: TextStyle(color: _textMain, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
           const SizedBox(height: 4),
-          Text('All registered users in real-time',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 13)),
-          const SizedBox(height: 24),
+          const Text('Manage and monitor all registered accounts',
+              style: TextStyle(color: _textMuted, fontSize: 14)),
+          const SizedBox(height: 32),
+
           Row(
             children: [
-              _chip('All', 'all'),
-              const SizedBox(width: 10),
+              _chip('All Users', 'all'),
+              const SizedBox(width: 12),
               _chip('Customers', 'customer'),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               _chip('Hosts', 'host'),
               const Spacer(),
               _searchField(),
             ],
           ),
-          const SizedBox(height: 20),
-          StreamBuilder<QuerySnapshot>(
-            stream: _filter == 'all'
-                ? FirebaseFirestore.instance
-                .collection('users')
-                .orderBy('createdAt', descending: true)
-                .snapshots()
-                : FirebaseFirestore.instance
-                .collection('users')
-                .where('role', isEqualTo: _filter)
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
-            builder: (context, snap) {
-              if (snap.connectionState ==
-                  ConnectionState.waiting) {
-                return const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFF4F8EF7)));
-              }
-              var docs = snap.data?.docs ?? [];
-              if (_search.isNotEmpty) {
-                docs = docs.where((d) {
-                  final data =
-                  d.data() as Map<String, dynamic>;
-                  final name = (data['name'] ?? '')
-                      .toLowerCase();
-                  final email = (data['email'] ?? '')
-                      .toLowerCase();
-                  return name.contains(_search) ||
-                      email.contains(_search);
-                }).toList();
-              }
+          const SizedBox(height: 24),
 
-              return Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A2E),
-                  borderRadius: BorderRadius.circular(14),
-                  border:
-                  Border.all(color: Colors.white10),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 10))],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _filter == 'all'
+                      ? FirebaseFirestore.instance.collection('users').orderBy('createdAt', descending: true).snapshots()
+                      : FirebaseFirestore.instance.collection('users')
+                      .where('role', isEqualTo: _filter)
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snap) {
+                    if (snap.hasError) {
+                      return _emptyState('Query error. If this is a new filter, Firebase may still be building the index.');
+                    }
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: _accentIndigo));
+                    }
+
+                    var docs = snap.data?.docs ?? [];
+                    if (_search.isNotEmpty) {
+                      docs = docs.where((d) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final name = (data['name'] ?? '').toString().toLowerCase();
+                        final email = (data['email'] ?? '').toString().toLowerCase();
+                        return name.contains(_search) || email.contains(_search);
+                      }).toList();
+                    }
+
+                    return Column(
+                      children: [
+                        _tableHeader(),
+                        Expanded(
+                          child: docs.isEmpty
+                              ? _emptyState('No users found in this category')
+                              : ListView.builder(
+                            itemCount: docs.length,
+                            itemBuilder: (context, index) {
+                              final d = docs[index].data() as Map<String, dynamic>;
+                              final createdAt = d['createdAt'] as Timestamp?;
+                              return _UserRow(
+                                name: d['name'] ?? 'No Name',
+                                email: d['email'] ?? 'No Email',
+                                phone: d['phone'] ?? '—',
+                                role: d['role'] ?? 'customer',
+                                joined: createdAt != null ? _fmt(createdAt.toDate()) : '—',
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-                child: Column(
-                  children: [
-                    _tableHeader(),
-                    if (docs.isEmpty)
-                      _emptyState('No users found')
-                    else
-                      ...docs.map((doc) {
-                        final d = doc.data()
-                        as Map<String, dynamic>;
-                        final role =
-                            d['role'] ?? 'customer';
-                        final createdAt =
-                        d['createdAt'] as Timestamp?;
-                        return _UserRow(
-                          name: d['name'] ?? '—',
-                          email: d['email'] ?? '—',
-                          phone: d['phone'] ?? '—',
-                          role: role,
-                          joined: createdAt != null
-                              ? _fmt(createdAt.toDate())
-                              : '—',
-                        );
-                      }),
-                  ],
-                ),
-              );
-            },
+              ),
+            ),
           ),
         ],
       ),
@@ -124,237 +120,133 @@ class _UsersScreenState extends State<UsersScreen> {
 
   Widget _tableHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(
-            bottom: BorderSide(color: Colors.white10)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      color: const Color(0xFFF8FAFC),
       child: Row(
         children: [
-          _th('NAME', flex: 3),
-          _th('EMAIL', flex: 4),
+          _th('NAME & CONTACT', flex: 4),
           _th('PHONE', flex: 2),
           _th('ROLE', flex: 2),
-          _th('JOINED', flex: 2),
+          _th('JOINED DATE', flex: 2),
         ],
       ),
     );
   }
 
-  Widget _emptyState(String msg) => Padding(
-    padding: const EdgeInsets.all(40),
-    child: Center(
-        child: Text(msg,
-            style: TextStyle(
-                color:
-                Colors.white.withOpacity(0.3)))),
+  Widget _th(String label, {int flex = 1}) => Expanded(
+    flex: flex,
+    child: Text(label, style: const TextStyle(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1)),
+  );
+
+  Widget _emptyState(String msg) => Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.person_off_outlined, size: 48, color: _textMuted.withOpacity(0.3)),
+        const SizedBox(height: 16),
+        Text(msg, textAlign: TextAlign.center, style: TextStyle(color: _textMuted.withOpacity(0.6), fontSize: 14)),
+      ],
+    ),
   );
 
   Widget _chip(String label, String value) {
     final isSelected = _filter == value;
     return GestureDetector(
       onTap: () => setState(() => _filter = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF4F8EF7)
-              : const Color(0xFF1A1A2E),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: isSelected
-                  ? const Color(0xFF4F8EF7)
-                  : Colors.white12),
+          color: isSelected ? _accentIndigo : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isSelected ? _accentIndigo : const Color(0xFFE2E8F0)),
         ),
         child: Text(label,
             style: TextStyle(
-                color: isSelected
-                    ? Colors.white
-                    : Colors.white54,
+                color: isSelected ? Colors.white : _textMuted,
                 fontSize: 13,
-                fontWeight: isSelected
-                    ? FontWeight.w600
-                    : FontWeight.normal)),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500)),
       ),
     );
   }
 
-  Widget _searchField() => SizedBox(
-    width: 260,
+  Widget _searchField() => Container(
+    width: 300,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+    ),
     child: TextField(
-      onChanged: (v) =>
-          setState(() => _search = v.toLowerCase()),
-      style: const TextStyle(color: Colors.white),
-      decoration: _searchDeco(
-          'Search by name or email...'),
+      onChanged: (v) => setState(() => _search = v.toLowerCase()),
+      style: const TextStyle(color: _textMain, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Search by name or email...',
+        hintStyle: TextStyle(color: _textMuted.withOpacity(0.5), fontSize: 13),
+        prefixIcon: const Icon(Icons.search, color: _textMuted, size: 18),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+      ),
     ),
   );
-
-  InputDecoration _searchDeco(String hint) =>
-      InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.3),
-            fontSize: 13),
-        prefixIcon: Icon(Icons.search,
-            color: Colors.white.withOpacity(0.3),
-            size: 18),
-        filled: true,
-        fillColor: const Color(0xFF1A1A2E),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-              color: Colors.white.withOpacity(0.1)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-              color: Colors.white.withOpacity(0.1)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide:
-          const BorderSide(color: Color(0xFF4F8EF7)),
-        ),
-        contentPadding:
-        const EdgeInsets.symmetric(vertical: 12),
-      );
-
-  Widget _th(String label, {int flex = 1}) => Expanded(
-    flex: flex,
-    child: Text(label,
-        style: TextStyle(
-            color: Colors.white.withOpacity(0.3),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.8)),
-  );
 }
 
-class _UserRow extends StatefulWidget {
-  final String name;
-  final String email;
-  final String phone;
-  final String role;
-  final String joined;
-
-  const _UserRow({
-    required this.name,
-    required this.email,
-    required this.phone,
-    required this.role,
-    required this.joined,
-  });
-
-  @override
-  State<_UserRow> createState() => _UserRowState();
-}
-
-class _UserRowState extends State<_UserRow> {
-  bool _hovered = false;
+class _UserRow extends StatelessWidget {
+  final String name, email, phone, role, joined;
+  const _UserRow({required this.name, required this.email, required this.phone, required this.role, required this.joined});
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 20, vertical: 14),
-        decoration: BoxDecoration(
-          color: _hovered
-              ? Colors.white.withOpacity(0.03)
-              : Colors.transparent,
-          border: const Border(
-              bottom: BorderSide(color: Colors.white10)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor:
-                    widget.role == 'host'
-                        ? const Color(0xFFFFB703)
-                        .withOpacity(0.2)
-                        : const Color(0xFF4F8EF7)
-                        .withOpacity(0.2),
-                    child: Text(
-                      widget.name.isNotEmpty
-                          ? widget.name[0].toUpperCase()
-                          : '?',
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9)))),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 4,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: _accentIndigo.withOpacity(0.1),
+                  child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: const TextStyle(color: _accentIndigo, fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w600, fontSize: 14)),
+                      Text(email, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(flex: 2, child: Text(phone, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13))),
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: role == 'host' ? const Color(0xFFF59E0B).withOpacity(0.1) : const Color(0xFF10B981).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(role.toUpperCase(),
                       style: TextStyle(
-                          color: widget.role == 'host'
-                              ? const Color(0xFFFFB703)
-                              : const Color(0xFF4F8EF7),
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(widget.name,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13),
-                        overflow: TextOverflow.ellipsis),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              flex: 4,
-              child: Text(widget.email,
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            Expanded(
-              flex: 2,
-              child: Text(widget.phone,
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: 13)),
-            ),
-            Expanded(
-              flex: 2,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: widget.role == 'host'
-                      ? const Color(0xFFFFB703)
-                      .withOpacity(0.12)
-                      : const Color(0xFF06D6A0)
-                      .withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
+                          color: role == 'host' ? const Color(0xFFD97706) : const Color(0xFF059669),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700)),
                 ),
-                child: Text(
-                  widget.role.toUpperCase(),
-                  style: TextStyle(
-                      color: widget.role == 'host'
-                          ? const Color(0xFFFFB703)
-                          : const Color(0xFF06D6A0),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
+              ],
             ),
-            Expanded(
-              flex: 2,
-              child: Text(widget.joined,
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.4),
-                      fontSize: 12)),
-            ),
-          ],
-        ),
+          ),
+          Expanded(flex: 2, child: Text(joined, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13))),
+        ],
       ),
     );
   }
