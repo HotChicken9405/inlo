@@ -1,9 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
 import 'booking_confirmed_screen.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -61,41 +61,62 @@ class _OtpVerificationScreenState
     setState(() => _hasError = false);
   }
 
+  String _formatDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
+
   Future<void> _notifyHost(String bookingId) async {
     try {
-      // Get host email
+      // Get host details
       final hostDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.propertyData['hostId'])
           .get();
+
       final hostEmail = hostDoc.data()?['email'] ?? '';
       final hostName = hostDoc.data()?['name'] ?? 'Host';
 
       if (hostEmail.isEmpty) return;
 
-      await http.post(
-        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+      final response = await http.post(
+        Uri.parse(
+            'https://api.emailjs.com/api/v1.0/email/send'),
         headers: {
           'Content-Type': 'application/json',
           'origin': 'http://localhost',
         },
         body: jsonEncode({
           'service_id': 'service_5zr6udv',
-          'template_id': 'template_g7wvulb',
+          'template_id': 'template_mntbuun',
           'user_id': 'rfgvvlUuiI-wgNGr6',
           'template_params': {
             'to_email': hostEmail,
             'to_name': hostName,
-            'otp_code': 'NEW BOOKING',
+            'booking_id': bookingId,
             'property_name':
             widget.propertyData['propertyName'] ?? '',
+            'room_name': widget.room['name'] ?? '',
+            'check_in': _formatDate(widget.checkIn),
+            'check_out': _formatDate(widget.checkOut),
+            'guests': '${widget.guests} guest(s)',
             'total_amount':
-            'Booking ID: $bookingId\nRoom: ${widget.room['name']}\nCheck-in: ${widget.checkIn.day}/${widget.checkIn.month}/${widget.checkIn.year}\nCheck-out: ${widget.checkOut.day}/${widget.checkOut.month}/${widget.checkOut.year}\nGuests: ${widget.guests}\nTotal: LKR ${widget.totalAmount.toStringAsFixed(0)}',
+            'LKR ${widget.totalAmount.toStringAsFixed(0)}',
+            'payment_method':
+            widget.paymentMethod == 'card'
+                ? 'Card Payment'
+                : 'Cash on Arrival',
           },
         }),
       );
+
+      print('Host notification status: ${response.statusCode}');
+      print('Host notification body: ${response.body}');
     } catch (e) {
-      // Silently fail — don't block booking if email fails
+      // Silently fail — booking still confirms even if email fails
       print('Host notification failed: $e');
     }
   }
@@ -120,6 +141,7 @@ class _OtpVerificationScreenState
       final bookingId =
           'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
 
+      // Save booking
       await FirebaseFirestore.instance
           .collection('bookings')
           .add({
@@ -142,7 +164,7 @@ class _OtpVerificationScreenState
         'createdAt': Timestamp.now(),
       });
 
-      // Update booked dates
+      // Update booked dates on the room
       final propertyRef = FirebaseFirestore.instance
           .collection('properties')
           .doc(widget.propertyId);
@@ -168,7 +190,7 @@ class _OtpVerificationScreenState
 
       await propertyRef.update({'roomTypes': roomTypes});
 
-      // Send email to host
+      // Notify host via email
       await _notifyHost(bookingId);
 
       if (!mounted) return;
@@ -177,7 +199,8 @@ class _OtpVerificationScreenState
         MaterialPageRoute(
           builder: (_) => BookingConfirmedScreen(
             bookingId: bookingId,
-            propertyName: widget.propertyData['propertyName'],
+            propertyName:
+            widget.propertyData['propertyName'],
             roomName: widget.room['name'],
             checkIn: widget.checkIn,
             checkOut: widget.checkOut,
@@ -205,7 +228,8 @@ class _OtpVerificationScreenState
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back,
+              color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -222,8 +246,10 @@ class _OtpVerificationScreenState
                 color: Colors.blue.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.mark_email_unread_outlined,
-                  color: Colors.blue.shade600, size: 30),
+              child: Icon(
+                  Icons.mark_email_unread_outlined,
+                  color: Colors.blue.shade600,
+                  size: 30),
             ),
             const SizedBox(height: 24),
             const Text('Verify your email',
@@ -239,7 +265,9 @@ class _OtpVerificationScreenState
                     fontSize: 14,
                     height: 1.5),
                 children: [
-                  const TextSpan(text: 'We sent a 6-digit OTP to\n'),
+                  const TextSpan(
+                      text:
+                      'We sent a 6-digit OTP to\n'),
                   TextSpan(
                     text: widget.email,
                     style: TextStyle(
@@ -253,7 +281,8 @@ class _OtpVerificationScreenState
 
             // OTP boxes
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment:
+              MainAxisAlignment.spaceBetween,
               children: List.generate(6, (index) {
                 return SizedBox(
                   width: 48,
@@ -265,14 +294,17 @@ class _OtpVerificationScreenState
                     keyboardType: TextInputType.number,
                     maxLength: 1,
                     inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly
+                      FilteringTextInputFormatter
+                          .digitsOnly
                     ],
-                    onChanged: (v) => _onOtpChanged(index, v),
+                    onChanged: (v) =>
+                        _onOtpChanged(index, v),
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color:
-                      _hasError ? Colors.red : Colors.black87,
+                      color: _hasError
+                          ? Colors.red
+                          : Colors.black87,
                     ),
                     decoration: InputDecoration(
                       counterText: '',
@@ -281,7 +313,8 @@ class _OtpVerificationScreenState
                           ? Colors.red.shade50
                           : Colors.grey.shade100,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                        BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: _hasError
                               ? Colors.red
@@ -290,7 +323,8 @@ class _OtpVerificationScreenState
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                        BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: _hasError
                               ? Colors.red.shade300
@@ -299,7 +333,8 @@ class _OtpVerificationScreenState
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                        BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: _hasError
                               ? Colors.red
@@ -318,11 +353,14 @@ class _OtpVerificationScreenState
               Row(
                 children: [
                   Icon(Icons.error_outline,
-                      color: Colors.red.shade400, size: 16),
+                      color: Colors.red.shade400,
+                      size: 16),
                   const SizedBox(width: 6),
-                  Text('Incorrect OTP. Please try again.',
+                  Text(
+                      'Incorrect OTP. Please try again.',
                       style: TextStyle(
-                          color: Colors.red.shade400, fontSize: 13)),
+                          color: Colors.red.shade400,
+                          fontSize: 13)),
                 ],
               ),
             ],
@@ -332,29 +370,39 @@ class _OtpVerificationScreenState
             SizedBox(
               width: double.infinity,
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                  child:
+                  CircularProgressIndicator())
                   : ElevatedButton(
                 onPressed: _verifyOtp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
+                  backgroundColor:
+                  Colors.blue.shade600,
                   foregroundColor: Colors.white,
                   padding:
-                  const EdgeInsets.symmetric(vertical: 16),
+                  const EdgeInsets.symmetric(
+                      vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius:
+                      BorderRadius.circular(
+                          12)),
                 ),
-                child: const Text('Verify & Confirm',
-                    style: TextStyle(fontSize: 16)),
+                child: const Text(
+                    'Verify & Confirm',
+                    style:
+                    TextStyle(fontSize: 16)),
               ),
             ),
             const SizedBox(height: 16),
             Center(
               child: TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () =>
+                    Navigator.pop(context),
                 child: Text(
                   'Change email or payment method',
                   style: TextStyle(
-                      color: Colors.grey.shade500, fontSize: 13),
+                      color: Colors.grey.shade500,
+                      fontSize: 13),
                 ),
               ),
             ),
