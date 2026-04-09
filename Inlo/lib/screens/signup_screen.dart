@@ -4,6 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
 import 'host_property_registration_screen.dart';
 
+// --- BRAND PALETTE ---
+const Color _indigo = Color(0xFF6366F1);
+const Color _bgSlate = Color(0xFFF8FAFC);
+const Color _textMain = Color(0xFF1E293B);
+const Color _textMuted = Color(0xFF64748B);
+
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -41,7 +47,6 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Check if email already exists across users collection
       final existingEmail = await FirebaseFirestore.instance
           .collection('users')
           .where('email', isEqualTo: _emailController.text.trim())
@@ -95,136 +100,121 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _bgSlate,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 50),
               const Text(
-                'Create account',
+                'Join Inlo',
                 style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: _textMain,
+                  letterSpacing: -1,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Sign up to get started',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              const SizedBox(height: 8),
+              const Text(
+                'Create an account to start exploring stays',
+                style: TextStyle(fontSize: 15, color: _textMuted),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 40),
+
               _buildLabel('FULL NAME'),
               const SizedBox(height: 8),
-              _buildTextField(controller: _nameController, hint: 'John Doe'),
-              const SizedBox(height: 20),
+              _buildTextField(controller: _nameController, hint: 'e.g. John Doe'),
+
+              const SizedBox(height: 24),
               _buildLabel('EMAIL ADDRESS'),
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _emailController,
-                hint: 'user@example.com',
+                hint: 'name@example.com',
                 keyboardType: TextInputType.emailAddress,
               ),
-              const SizedBox(height: 20),
+
+              const SizedBox(height: 24),
               _buildLabel('PASSWORD'),
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _passwordController,
-                hint: '',
+                hint: '••••••••',
                 isPassword: true,
                 obscure: _obscurePassword,
-                onToggle: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
+                onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
-              const SizedBox(height: 20),
+
+              const SizedBox(height: 24),
               _buildLabel('CONFIRM PASSWORD'),
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _confirmPasswordController,
-                hint: '',
+                hint: '••••••••',
                 isPassword: true,
                 obscure: _obscureConfirm,
-                onToggle: () =>
-                    setState(() => _obscureConfirm = !_obscureConfirm),
+                onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
               ),
-              const SizedBox(height: 30),
+
+              const SizedBox(height: 40),
+
+              // --- Main Action Button ---
               SizedBox(
                 width: double.infinity,
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(child: CircularProgressIndicator(color: _indigo))
                     : ElevatedButton(
                   onPressed: _signUp,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black87,
+                    backgroundColor: _indigo,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text(
-                    'Create account',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  child: const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
+
               const SizedBox(height: 16),
 
-              // ── Sign up as a Host ──
+              // --- Host Registration Option ---
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton(
+                child: TextButton(
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const HostPropertyRegistrationScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const HostPropertyRegistrationScreen()),
                     );
                   },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: BorderSide(color: Colors.blue.shade600, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    'Sign up as a Host',
-                    style: TextStyle(
-                      color: Colors.blue.shade600,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Text(
+                    'Want to host your property? Sign up here',
+                    style: TextStyle(color: _indigo, fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      'Already have an account? ',
-                      style: TextStyle(color: Colors.grey.shade500),
-                    ),
+                    const Text('Already have an account? ', style: TextStyle(color: _textMuted)),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: Text(
+                      child: const Text(
                         'Sign in',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(color: _indigo, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -235,11 +225,11 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: Colors.grey.shade600,
-        letterSpacing: 0.8,
+        fontWeight: FontWeight.w800,
+        color: _textMuted,
+        letterSpacing: 1.2,
       ),
     );
   }
@@ -256,23 +246,28 @@ class _SignupScreenState extends State<SignupScreen> {
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
+      style: const TextStyle(color: _textMain, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade400),
+        hintStyle: TextStyle(color: _textMuted.withOpacity(0.4)),
         filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
+        fillColor: Colors.white,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: _indigo, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         suffixIcon: isPassword
-            ? TextButton(
+            ? IconButton(
           onPressed: onToggle,
-          child: Text(
-            obscure ? 'Show' : 'Hide',
-            style: TextStyle(color: Colors.blue.shade700),
+          icon: Icon(
+            obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: _textMuted,
+            size: 20,
           ),
         )
             : null,
